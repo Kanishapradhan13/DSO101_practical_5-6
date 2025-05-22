@@ -22,20 +22,42 @@ pipeline {
         stage('Install Dependencies') {
             steps {
                 echo 'Installing dependencies...'
-                sh 'npm ci'
+                sh '''
+                    echo "Node.js version:"
+                    node --version
+                    echo "NPM version:"
+                    npm --version
+                    echo "Installing dependencies..."
+                    npm ci
+                    echo "Checking installed packages..."
+                    npm list --depth=0 || echo "Some peer dependency warnings (normal)"
+                '''
             }
         }
         
         stage('Test') {
             steps {
                 echo 'Running tests...'
-                sh 'npm test'
+                script {
+                    try {
+                        // Try to run tests with junit reporter first
+                        sh 'npm run test:junit'
+                    } catch (Exception e) {
+                        echo 'Jest-junit failed, running basic tests...'
+                        // Fall back to basic test without junit reporter
+                        sh 'npm test'
+                    }
+                }
             }
             post {
                 always {
                     script {
+                        // Only try to publish junit results if the file exists
                         if (fileExists('junit.xml')) {
+                            echo 'Publishing test results...'
                             junit 'junit.xml'
+                        } else {
+                            echo 'No junit.xml file found, skipping test result publishing'
                         }
                     }
                 }
@@ -47,31 +69,68 @@ pipeline {
                 echo 'Building React application...'
                 sh 'npm run build'
             }
-        }
-        
-        stage('Build Docker Image') {
-            steps {
-                echo 'Building Docker image...'
-                script {
-                    docker.build("${DOCKER_IMAGE}:${DOCKER_TAG}")
-                    docker.build("${DOCKER_IMAGE}:latest")
+            post {
+                success {
+                    archiveArtifacts artifacts: 'build/**/*', allowEmptyArchive: true
                 }
             }
         }
         
-        stage('Push to Docker Hub') {
+        stage('Build Docker Image') {
+            when {
+                anyOf {
+                    branch 'main'
+                    environment name: 'BUILD_DOCKER', value: 'true'
+                }
+            }
             steps {
-                echo 'Pushing Docker image to Docker Hub...'
+                echo 'Building Docker image...'
                 script {
-                    docker.withRegistry('https://index.docker.io/v1/', 'dockerhub-credentials') {
-                        docker.image("${DOCKER_IMAGE}:${DOCKER_TAG}").push()
-                        docker.image("${DOCKER_IMAGE}:latest").push()
+                    try {
+                        // Try with host network first
+                        sh "docker build --network=host -t ${DOCKER_IMAGE}:${DOCKER_TAG} ."
+                        sh "docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_IMAGE}:latest"
+                        echo "Docker image built successfully"
+                    } catch (Exception e1) {
+                        echo "Docker build with host network failed, trying default network..."
+                        try {
+                            sh "docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} ."
+                            sh "docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_IMAGE}:latest"
+                            echo "Docker image built successfully"
+                        } catch (Exception e2) {
+                            echo "Docker build failed completely: ${e2.getMessage()}"
+                            echo "Skipping Docker build due to network issues"
+                            currentBuild.result = 'UNSTABLE'
+                        }
                     }
                 }
             }
         }
         
+        stage('Push to Docker Hub') {
+            when {
+                anyOf {
+                    branch 'main'
+                    environment name: 'BUILD_DOCKER', value: 'true'
+                }
+            }
+            steps {
+                echo 'Pushing Docker image to Docker Hub...'
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', usernameVariable: 'DOCKER_USERNAME', passwordVariable: 'DOCKER_PASSWORD')]) {
+                    sh 'echo $DOCKER_PASSWORD | docker login -u $DOCKER_USERNAME --password-stdin'
+                    sh "docker push ${DOCKER_IMAGE}:${DOCKER_TAG}"
+                    sh "docker push ${DOCKER_IMAGE}:latest"
+                }
+            }
+        }
+        
         stage('Clean Docker Images') {
+            when {
+                anyOf {
+                    branch 'main'
+                    environment name: 'BUILD_DOCKER', value: 'true'
+                }
+            }
             steps {
                 echo 'Cleaning up local Docker images...'
                 sh """
@@ -87,14 +146,9 @@ pipeline {
                 branch 'main'
             }
             steps {
-                echo 'Deploying to production...'
                 script {
-                    // Example deployment - you can customize this
-                    sh """
-                        echo 'Deploying Docker container...'
-                        # docker run -d -p 80:80 --name my-react-app ${DOCKER_IMAGE}:latest
-                        echo 'Deployment completed!'
-                    """
+                    echo "Deploying to production..."
+                    sh 'npm run deploy:prod'
                 }
             }
         }
@@ -107,7 +161,11 @@ pipeline {
         }
         success {
             echo 'Pipeline succeeded!'
-            echo "Docker image pushed: ${DOCKER_IMAGE}:${DOCKER_TAG}"
+            script {
+                if (env.BRANCH_NAME == 'main') {
+                    echo "Docker image pushed: ${DOCKER_IMAGE}:${DOCKER_TAG}"
+                }
+            }
         }
         failure {
             echo 'Pipeline failed!'
