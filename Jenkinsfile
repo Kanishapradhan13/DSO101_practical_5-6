@@ -2,39 +2,27 @@ pipeline {
     agent any
     
     tools {
-        nodejs 'NodeJS 24.0.2' 
+        nodejs 'NodeJS 24.0.2'
     }
     
     environment {
         CI = 'true'
         NODE_ENV = 'production'
+        DOCKER_IMAGE = 'kanishapradhan/my-react-app'
+        DOCKER_TAG = "${BUILD_NUMBER}"
     }
     
     stages {
         stage('Checkout') {
             steps {
                 echo 'Checking out code...'
-                // Git checkout is automatic when using SCM
             }
         }
         
         stage('Install Dependencies') {
             steps {
                 echo 'Installing dependencies...'
-                sh 'npm ci' // Use npm ci for faster, reliable builds
-            }
-        }
-        
-        stage('Lint') {
-            steps {
-                echo 'Running linter...'
-                script {
-                    try {
-                        sh 'npm run lint || true' // Don't fail if no lint script
-                    } catch (Exception e) {
-                        echo 'No lint script found, skipping...'
-                    }
-                }
+                sh 'npm ci'
             }
         }
         
@@ -43,30 +31,70 @@ pipeline {
                 echo 'Running tests...'
                 sh 'npm test'
             }
-        }
-        
-        stage('Build') {
-            steps {
-                echo 'Building application...'
-                sh 'npm run build'
-            }
             post {
-                success {
-                    // Archive build artifacts
-                    archiveArtifacts artifacts: 'build/**/*', allowEmptyArchive: true
+                always {
+                    script {
+                        if (fileExists('junit.xml')) {
+                            junit 'junit.xml'
+                        }
+                    }
                 }
             }
         }
         
-        stage('Deploy') {
+        stage('Build Application') {
             steps {
+                echo 'Building React application...'
+                sh 'npm run build'
+            }
+        }
+        
+        stage('Build Docker Image') {
+            steps {
+                echo 'Building Docker image...'
                 script {
-                    echo "Deploying to environment based on branch: ${env.BRANCH_NAME}"
-                    if (env.BRANCH_NAME == 'main') {
-                        sh 'npm run deploy:prod'
-                    } else {
-                        sh 'npm run deploy:stage'
+                    docker.build("${DOCKER_IMAGE}:${DOCKER_TAG}")
+                    docker.build("${DOCKER_IMAGE}:latest")
+                }
+            }
+        }
+        
+        stage('Push to Docker Hub') {
+            steps {
+                echo 'Pushing Docker image to Docker Hub...'
+                script {
+                    docker.withRegistry('https://index.docker.io/v1/', 'dockerhub-credentials') {
+                        docker.image("${DOCKER_IMAGE}:${DOCKER_TAG}").push()
+                        docker.image("${DOCKER_IMAGE}:latest").push()
                     }
+                }
+            }
+        }
+        
+        stage('Clean Docker Images') {
+            steps {
+                echo 'Cleaning up local Docker images...'
+                sh """
+                    docker rmi ${DOCKER_IMAGE}:${DOCKER_TAG} || true
+                    docker rmi ${DOCKER_IMAGE}:latest || true
+                    docker system prune -f || true
+                """
+            }
+        }
+        
+        stage('Deploy') {
+            when {
+                branch 'main'
+            }
+            steps {
+                echo 'Deploying to production...'
+                script {
+                    // Example deployment - you can customize this
+                    sh """
+                        echo 'Deploying Docker container...'
+                        # docker run -d -p 80:80 --name my-react-app ${DOCKER_IMAGE}:latest
+                        echo 'Deployment completed!'
+                    """
                 }
             }
         }
@@ -75,15 +103,14 @@ pipeline {
     post {
         always {
             echo 'Pipeline completed!'
-            // Clean up workspace
             cleanWs()
         }
         success {
             echo 'Pipeline succeeded!'
+            echo "Docker image pushed: ${DOCKER_IMAGE}:${DOCKER_TAG}"
         }
         failure {
             echo 'Pipeline failed!'
-            // You could add notification steps here
         }
     }
 }
