@@ -21,3 +21,10 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+echo "node_modules/
+build/
+.env
+junit.xml
+*.log" > .gitignore
+
