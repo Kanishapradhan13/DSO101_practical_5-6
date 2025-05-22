@@ -2,7 +2,7 @@ pipeline {
     agent any
     
     tools {
-        nodejs 'NodeJS 24.0.2'
+        nodejs 'NodeJS 20.0.2'
     }
     
     environment {
@@ -87,21 +87,12 @@ pipeline {
                 echo 'Building Docker image...'
                 script {
                     try {
-                        // Try with host network first
-                        sh "docker build --network=host -t ${DOCKER_IMAGE}:${DOCKER_TAG} ."
+                        sh "docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} ."
                         sh "docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_IMAGE}:latest"
                         echo "Docker image built successfully"
-                    } catch (Exception e1) {
-                        echo "Docker build with host network failed, trying default network..."
-                        try {
-                            sh "docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} ."
-                            sh "docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_IMAGE}:latest"
-                            echo "Docker image built successfully"
-                        } catch (Exception e2) {
-                            echo "Docker build failed completely: ${e2.getMessage()}"
-                            echo "Skipping Docker build due to network issues"
-                            currentBuild.result = 'UNSTABLE'
-                        }
+                    } catch (Exception e) {
+                        echo "Docker build failed: ${e.getMessage()}"
+                        currentBuild.result = 'UNSTABLE'
                     }
                 }
             }
