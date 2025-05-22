@@ -8,6 +8,7 @@ pipeline {
     environment {
         CI = 'true'
         NODE_ENV = 'production'
+        BUILD_DOCKER = 'true'
         DOCKER_IMAGE = 'kanishapradhan/my-react-app'
         DOCKER_TAG = "${BUILD_NUMBER}"
     }
