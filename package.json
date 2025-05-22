@@ -14,8 +14,7 @@
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
-    "test": "react-scripts test --watchAll=false --ci",
-    "test:junit": "react-scripts test --watchAll=false --ci --testResultsProcessor=jest-junit",
+    "test": "react-scripts test --watchAll=false --ci --testResultsProcessor=jest-junit",
     "eject": "react-scripts eject",
     "deploy:prod": "echo 'Deploying to production...'",
     "deploy:stage": "echo 'Deploying to staging...'"
@@ -40,8 +39,5 @@
   },
   "devDependencies": {
     "jest-junit": "^16.0.0"
-  },
-  "jest": {
-    "testResultsProcessor": "jest-junit"
   }
 }
