@@ -43,16 +43,6 @@ pipeline {
                 echo 'Running tests...'
                 sh 'npm test'
             }
-            post {
-                always {
-                    // Publish test results
-                    script {
-                        if (fileExists('junit.xml')) {
-                            junit 'junit.xml'
-                        }
-                    }
-                }
-            }
         }
         
         stage('Build') {
