@@ -38,28 +38,21 @@ pipeline {
         stage('Test') {
             steps {
                 echo 'Running tests...'
-                script {
-                    try {
-                        // Try to run tests with junit reporter first
-                        sh 'npm run test:junit'
-                    } catch (Exception e) {
-                        echo 'Jest-junit failed, running basic tests...'
-                        // Fall back to basic test without junit reporter
-                        sh 'npm test'
-                    }
-                }
+                sh '''
+                    echo "Running React tests..."
+                    npm test
+                    echo "Tests completed successfully"
+                '''
             }
             post {
                 always {
-                    script {
-                        // Only try to publish junit results if the file exists
-                        if (fileExists('junit.xml')) {
-                            echo 'Publishing test results...'
-                            junit 'junit.xml'
-                        } else {
-                            echo 'No junit.xml file found, skipping test result publishing'
-                        }
-                    }
+                    echo 'Test stage completed'
+                }
+                success {
+                    echo 'All tests passed! ✅'
+                }
+                failure {
+                    echo 'Some tests failed! ❌'
                 }
             }
         }
