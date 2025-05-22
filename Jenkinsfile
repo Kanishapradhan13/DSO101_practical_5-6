@@ -127,16 +127,17 @@ pipeline {
         }
         
         stage('Deploy') {
-            when {
-                branch 'main'
-            }
             steps {
                 script {
-                    echo "Deploying to production..."
+                if (env.BRANCH_NAME == 'main') {
                     sh 'npm run deploy:prod'
+                } else {
+                    sh 'npm run deploy:stage'
+                }
                 }
             }
-        }
+	    }
+
     }
     
     post {
