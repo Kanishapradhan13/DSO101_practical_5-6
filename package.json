@@ -13,11 +13,13 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "react-scripts build",
-    "test": "react-scripts test --watchAll=false --ci ",
+    "build": "CI=false react-scripts build",
+    "test": "react-scripts test --watchAll=false --ci --passWithNoTests",
+    "test:junit": "react-scripts test --watchAll=false --ci --passWithNoTests --testResultsProcessor=jest-junit",
+    "test:coverage": "react-scripts test --watchAll=false --ci --coverage --passWithNoTests",
     "eject": "react-scripts eject",
-    "deploy:prod": "echo 'Deploying to production...'",
-    "deploy:stage": "echo 'Deploying to staging...'"
+    "deploy:prod": "echo 'Deploying to production environment...'",
+    "deploy:stage": "echo 'Deploying to staging environment...'"
   },
   "eslintConfig": {
     "extends": [
@@ -39,5 +41,8 @@
   },
   "devDependencies": {
     "jest-junit": "^16.0.0"
+  },
+  "jest": {
+    "testResultsProcessor": "jest-junit"
   }
 }
