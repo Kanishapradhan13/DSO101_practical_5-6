@@ -14,7 +14,7 @@
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
-    "test": "react-scripts test --watchAll=false --ci --testResultsProcessor=jest-junit",
+    "test": "react-scripts test --watchAll=false --ci ",
     "eject": "react-scripts eject",
     "deploy:prod": "echo 'Deploying to production...'",
     "deploy:stage": "echo 'Deploying to staging...'"
